@@ -1,0 +1,52 @@
+extensions:
+  health_check:
+    endpoint: 0.0.0.0:13133
+  zpages:
+    endpoint: 0.0.0.0:55679
+
+receivers:
+  otlp:
+    protocols:
+      grpc:
+        endpoint: 0.0.0.0:4317
+      http:
+        endpoint: 0.0.0.0:55681
+  testreciever:
+    listen_address: 0.0.0.0:54526
+  # This section is used to collect the OpenTelemetry Collector metrics
+
+processors:
+  batch:
+  # Enabling the memory_limiter is strongly recommended for every pipeline.
+  # Configuration is based on the amount of memory allocated to the collector.
+  # In general, the ballast should be set to 1/3 of the collector's memory, the limit
+  # should be 90% of the collector's memory up to 2GB. The simplest way to specify the
+  # ballast size is set the value of F5_BALLAST_SIZE_MIB env variable. Alternatively, the
+  # --mem-ballast-size-mib command line flag can be passed and take priority.
+  # For more information about memory limiter, see
+  # https://github.com/open-telemetry/opentelemetry-collector/blob/main/processor/memorylimiter/README.md
+  memory_limiter:
+    #ballast_size_mib: 50
+    check_interval: 2s
+    limit_mib: 250
+  ## detect if the collector is running on a cloud system
+  ## important for creating unique cloud provider dimensions
+  resourcedetection:
+    detectors: [system, gce, ecs, ec2, azure]
+    override: false
+
+exporters:
+  # Debug
+  logging:
+    loglevel: debug
+
+service:
+  extensions: [health_check, zpages]
+  pipelines:
+    logs:
+      receivers: [testreciever]
+      processors:
+        - memory_limiter
+        - batch
+        - resourcedetection
+      exporters: [logging]
